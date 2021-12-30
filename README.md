@@ -16,7 +16,7 @@ forma de mesaje text.
  - Mesajele vor fi salvate intr-un fisier si se va putea urmari istoricul
 mesajelor primite/trimise unui anumit client. 
  - Id-urile clientilor trebuie sa fie unice.
- - Comunicarea trebuie sa fie criptata, si sa permita si emojy precum si trimitere de poze.
+ - Comunicarea trebuie sa fie criptata, si sa permita si emoji precum si trimitere de poze.
 
 INPUT: id-ul clientului curent
 
