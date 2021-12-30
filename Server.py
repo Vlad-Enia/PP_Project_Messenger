@@ -1,9 +1,10 @@
 import socket
-import json
 from threading import Thread
+import pickle
+
 
 SERVER_ADDRESS = '127.0.0.1'
-SERVER_PORT = 6000
+SERVER_PORT = 6001
 CLIENT_NB = 5
 client_dict = dict()
 socket = socket.socket()
@@ -18,7 +19,11 @@ def send_msg(recipient, msg_type, msg, recipient_socket):
         'recipient': recipient,
         'body': msg
     }
-    recipient_socket.send(json.dumps(d).encode())
+    recipient_socket.send(pickle.dumps(d))
+
+
+def send_msg_pickle(msg_pickle, recipient_socket):
+    recipient_socket.send(pickle.dumps(msg_pickle))
 
 
 def handle_client(conn):
@@ -32,7 +37,7 @@ def handle_client(conn):
             conn.close()
             exit()
         else:
-            msg = json.loads(data)
+            msg = pickle.loads(data)
             print(msg)
             if msg['type'] == 'id':
                 client_id = msg['body']
@@ -42,11 +47,23 @@ def handle_client(conn):
                 elif client_id in client_dict:
                     send_msg('', 'register', 'Invalid ID: already taken.', conn)
                 else:
-                    client_dict[client_id] = conn
+
                     confirmation = f'Welcome {client_id}!'
                     send_msg(client_id, 'register_ok', confirmation, conn)
+                    formatted_public_key = conn.recv(4096)
+                    client_dict[client_id] = (conn, formatted_public_key)
+
                     break
     print(f' [THREAD] Client {client_id} registered successfully!')
+    while len(client_dict) < 2:
+        pass
+    recipient_id = ''
+    for cl in client_dict.keys():
+        if cl != client_id:
+            send_msg(client_id, 'recipient_id', cl, conn)
+            conn.send(client_dict[cl][1])
+            recipient_id = cl
+            break
     while True:
         try:
             data = conn.recv(4096)
@@ -55,8 +72,9 @@ def handle_client(conn):
             conn.close()
             exit()
         else:
-            msg = json.loads(data)
-            print(' [THREAD] Message from client:', msg)
+            msg = pickle.loads(data)
+            # print(' [THREAD] Message from client:', msg)
+            send_msg_pickle(msg, client_dict[recipient_id][0])
 
     print(' [THREAD] Closing connection...')
     conn.close()
