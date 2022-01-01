@@ -14,6 +14,7 @@ def rec_msg(sender_socket):
         sender = msg['sender']
         encrypted_message = msg['body']
         decrypted_message = rsa.decrypt(encrypted_message, private_key).decode('utf8')
+        log_message(f'{client_id}_received_messages.txt', sender, decrypted_message)
         print(f'{sender}: {decrypted_message}')
 
 
@@ -40,10 +41,17 @@ def connect_and_register(server_address, server_port):
         message = pickle.loads(sock.recv(4096))
     print('Server:', message['body'])
     formatted_public_key = public_key.save_pkcs1(format='DER')
-    sock.send(formatted_public_key)
+    # sock.send(formatted_public_key)
+    send_msg('server', 'pbkey', cl_id, formatted_public_key, sock)
     # message = pickle.loads(sock.recv(4096))
     # print('Server:', message['body'])
     return sock, cl_id
+
+
+def log_message(filename, sender, message):
+    f = open(filename, 'a')
+    f.write(f'{sender}: {message}\n')
+    f.close()
 
 
 server_socket, client_id = connect_and_register(SERVER_ADDRESS, SERVER_PORT)
@@ -63,5 +71,7 @@ t.start()
 
 while True:
     msg = input()
+    log_message('message_history_log.txt',client_id, msg)
+    log_message(f'{client_id}_sent_messages.txt', client_id, msg)
     msg_encrypted = rsa.encrypt(msg.encode('utf8'), recipient_public_key)
     send_msg(recipient_id, 'msg', client_id, msg_encrypted, server_socket)

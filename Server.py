@@ -1,11 +1,12 @@
 import socket
 from threading import Thread
 import pickle
-
+import os
 
 SERVER_ADDRESS = '127.0.0.1'
 SERVER_PORT = 6001
 CLIENT_NB = 5
+MESSAGE_LOG_FILENAME = 'message_history_log.txt'
 client_dict = dict()
 socket = socket.socket()
 socket.bind((SERVER_ADDRESS, SERVER_PORT))
@@ -38,7 +39,7 @@ def handle_client(conn):
             exit()
         else:
             msg = pickle.loads(data)
-            print(msg)
+            # print(msg)
             if msg['type'] == 'id':
                 client_id = msg['body']
                 if client_id == '':
@@ -50,9 +51,10 @@ def handle_client(conn):
 
                     confirmation = f'Welcome {client_id}!'
                     send_msg(client_id, 'register_ok', confirmation, conn)
-                    formatted_public_key = conn.recv(4096)
-                    client_dict[client_id] = (conn, formatted_public_key)
-
+                    msg = pickle.loads(conn.recv(4096))
+                    print("MESSAGE", msg)
+                    if msg['type'] == 'pbkey':
+                        client_dict[client_id] = (conn, msg['body'])
                     break
     print(f' [THREAD] Client {client_id} registered successfully!')
     while len(client_dict) < 2:
@@ -73,12 +75,14 @@ def handle_client(conn):
             exit()
         else:
             msg = pickle.loads(data)
-            # print(' [THREAD] Message from client:', msg)
+            # print('MESSAGE:',msg)
+            # log_message(data['body'])
             send_msg_pickle(msg, client_dict[recipient_id][0])
 
     print(' [THREAD] Closing connection...')
     conn.close()
     exit()
+
 
 
 while True:
