@@ -3,6 +3,7 @@ from threading import Thread
 import pickle
 import os
 
+
 SERVER_ADDRESS = '127.0.0.1'
 SERVER_PORT = 6001
 CLIENT_NB = 5
@@ -49,7 +50,7 @@ def handle_client(conn):
                     send_msg('', 'register', 'Invalid ID: already taken.', conn)
                 else:
 
-                    confirmation = f'Welcome {client_id}!'
+                    confirmation = f'Welcome {client_id}! Please wait for another client to join.'
                     send_msg(client_id, 'register_ok', confirmation, conn)
                     msg = pickle.loads(conn.recv(4096))
                     print("MESSAGE", msg)
@@ -71,8 +72,7 @@ def handle_client(conn):
             data = conn.recv(4096)
         except Exception as e:
             print(' [THREAD] Connection interrupted...')
-            conn.close()
-            exit()
+            break
         else:
             msg = pickle.loads(data)
             # print('MESSAGE:',msg)
@@ -80,6 +80,7 @@ def handle_client(conn):
             send_msg_pickle(msg, client_dict[recipient_id][0])
 
     print(' [THREAD] Closing connection...')
+    client_dict.pop(client_id, None)
     conn.close()
     exit()
 

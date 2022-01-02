@@ -4,18 +4,22 @@ import rsa
 from threading import Thread
 import PySimpleGUI as sg
 import os
+import shutil
+import copy
 
 SERVER_ADDRESS = '127.0.0.1'
 SERVER_PORT = 6001
 public_key, private_key = rsa.newkeys(512)
 print(f'Your public key: {public_key}\n')
 
-def rec_msg(sender_socket):
+
+def rec_msg(sender_socket, msg_list):
     while True:
         msg = pickle.loads(sender_socket.recv(4096))
         sender = msg['sender']
         encrypted_message = msg['body']
         decrypted_message = rsa.decrypt(encrypted_message, private_key).decode('utf8')
+        msg_list.append(decrypted_message)
         log_message(f'{dir_path}/{client_id}_received_messages.txt', sender, decrypted_message)
         print(f'{sender}: {decrypted_message}')
 
@@ -54,8 +58,9 @@ def connect_and_register(server_address, server_port):
     while message['type'] == 'register':
         event, values = window.read()
         if event == sg.WIN_CLOSED:
-            break
-        elif event == '-BUTTON-' or event == 'Submit':
+            window.close()
+            exit()
+        elif event == '-BUTTON-':
             cl_id = values["-ID-"]
             send_msg('server', 'id', cl_id, cl_id, sock)
             message = pickle.loads(sock.recv(4096))
@@ -78,6 +83,8 @@ server_socket, client_id = connect_and_register(SERVER_ADDRESS, SERVER_PORT)
 
 dir_path = f'./{client_id}_messages'
 
+if os.path.isdir(dir_path):
+    shutil.rmtree(dir_path)
 os.mkdir(dir_path)
 
 print("Waiting for the other client to connect...")
@@ -89,13 +96,48 @@ if msg['type'] == 'recipient_id':
     print(f'{recipient_id} connected! Public key: {recipient_public_key}\n')
 
 
-t = Thread(target=rec_msg, args=(server_socket,))
+recipient_column = []
+sender_column = []
+
+layout = [
+    [
+        sg.Column(recipient_column, key='-RECIPIENT-'),
+        sg.VSeparator(),
+        sg.Column(sender_column, key='-SENDER-')
+    ],
+    [
+        sg.In(size=(25, 1), enable_events=True, key="-SEND_TEXT-"),
+        sg.Button('Send', enable_events=True, key='-SEND_BUTTON-', bind_return_key=True)
+    ]
+]
+
+window = sg.Window(f'{client_id} chat window', layout, element_justification='center')
+
+received_msg_list = []
+received_msg_list_copy = []
+t = Thread(target=rec_msg, args=(server_socket, received_msg_list))
 t.daemon = True
 t.start()
 
 while True:
-    msg = input()
-    log_message(f'{dir_path}/message_history_log.txt',client_id, msg)
-    log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
-    msg_encrypted = rsa.encrypt(msg.encode('utf8'), recipient_public_key)
-    send_msg(recipient_id, 'msg', client_id, msg_encrypted, server_socket)
+    event, values = window.read(timeout=100)
+
+    if event == sg.TIMEOUT_KEY and len(received_msg_list) != len(received_msg_list_copy):
+        window.extend_layout(window['-RECIPIENT-'], [[sg.Text(received_msg_list[-1])]])
+        window.extend_layout(window['-SENDER-'], [[sg.Text('')]])
+        received_msg_list_copy = copy.deepcopy(received_msg_list)
+    elif event == sg.WIN_CLOSED:
+        break
+    elif event == '-SEND_BUTTON-':
+        msg = values['-SEND_TEXT-']
+        window['-SEND_TEXT-']('')      #clear input box when sending
+        # window.Refresh()
+        window.extend_layout(window['-SENDER-'], [[sg.Text(msg)]])
+        window.extend_layout(window['-RECIPIENT-'], [[sg.Text('')]])
+        log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
+        log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
+
+        msg_encrypted = rsa.encrypt(msg.encode('utf8'), recipient_public_key)
+        send_msg(recipient_id, 'msg', client_id, msg_encrypted, server_socket)
+
+window.close()
