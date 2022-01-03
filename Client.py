@@ -97,30 +97,39 @@ def connect_and_register(server_address, server_port):
 server_socket, client_id, recipient_id, recipient_public_key = connect_and_register(SERVER_ADDRESS, SERVER_PORT)
 dir_path = create_client_dir(client_id)
 
-# print("Waiting for the other client to connect...")
-# msg = pickle.loads(server_socket.recv(4096))
-# if msg['type'] == 'recipient_id':
-#     recipient_id = msg['body']
-#     formatted_public_key = server_socket.recv(4096)
-#     recipient_public_key = rsa.key.PublicKey.load_pkcs1(formatted_public_key, format='DER')
-#     print(f'{recipient_id} connected! Public key: {recipient_public_key}\n')
 
-WINDOW_WIDTH = 100
-WINDOW_HEIGHT = 100
+WINDOW_WIDTH = 700
+WINDOW_HEIGHT = 800
+BACKGROUND_COLOR = '#232629'
+TEXT_ELEMENT_WIDTH = 70
 
-recipient_column = []
-sender_column = []
+
+"""
+    The layout is as follows:
+        -   only one column
+        -   each message is within a text element, that is as wide as the column
+        -   the text within the text element is justified to right if it sent, and to left if it is received
+        
+    I've tried adding a frame surrounding each message, but I couldn't justify them the way I wanted. 
+    It seems like justification within a column is not working.
+    Next step is to try to have, for each message, a frame as wide as the column, and within that frame another frame surrounding the message, 
+        that will be justified to either left or right (i.e. try to justify frames within another frame, and not within a column)
+"""
+
+column_layout = []
 layout = [
     [
-        sg.Column(layout=recipient_column, key='-RECIPIENT-', size=(210,210), scrollable=True, vertical_scroll_only=True, expand_y=True),
-        sg.Column(layout=sender_column, key='-SENDER-',size=(210,210), scrollable=True, vertical_scroll_only=True, expand_y=True)
+        sg.Frame('',[[sg.Column(layout=column_layout, key='-CHAT-', scrollable=True, expand_x=True, expand_y=True, vertical_scroll_only=True, pad=20, background_color=BACKGROUND_COLOR, element_justification='right')]], size=(WINDOW_WIDTH, WINDOW_HEIGHT-100), background_color=BACKGROUND_COLOR)
+
     ],
     [
         sg.In(size=(25, 1), enable_events=True, key="-SEND_TEXT-"),
-        sg.Button('Send', enable_events=True, key='-SEND_BUTTON-', bind_return_key=True)
+        sg.Button('Send', enable_events=True, key='-SEND_BUTTON-', bind_return_key=True),
+
     ]
 ]
-window = sg.Window(f'{client_id} chat window', layout)
+window = sg.Window(f'{client_id}\'s chat window', layout, size=(WINDOW_WIDTH,WINDOW_HEIGHT))
+
 
 received_msg_list = []
 received_msg_list_copy = []
@@ -134,28 +143,28 @@ while True:
 
     if event == sg.TIMEOUT_KEY and len(received_msg_list) != len(received_msg_list_copy):
 
-        window.extend_layout(window['-RECIPIENT-'], [[sg.Text(received_msg_list[-1], background_color='red')]])
-        window['-RECIPIENT-'].contents_changed()
-        window.extend_layout(window['-SENDER-'], [[sg.Text('')]])
-        window['-SENDER-'].contents_changed()
+        window.extend_layout(window['-CHAT-'], [[sg.Text(f'{recipient_id}: {received_msg_list[-1]}', justification='l', size=TEXT_ELEMENT_WIDTH, background_color=BACKGROUND_COLOR, pad=0)]])
+        window['-CHAT-'].contents_changed()
 
         received_msg_list_copy = copy.deepcopy(received_msg_list)
     elif event == sg.WIN_CLOSED:
         break
     elif event == '-SEND_BUTTON-':
         msg = values['-SEND_TEXT-']
-        window['-SEND_TEXT-'].update('')     #clear input box when sending
 
-        window.extend_layout(window['-SENDER-'], [[sg.Text(msg,  background_color='green', justification='r')]])
-        window['-SENDER-'].contents_changed()
-        window.extend_layout(window['-RECIPIENT-'], [[sg.Text('')]])
-        window['-RECIPIENT-'].contents_changed()
+        if len(msg) > 50:
+            sg.popup('Message limit is 50 characters!')
+        else:
+            window['-SEND_TEXT-'].update('')     #clear input box when sending
 
-        log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
-        log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
+            window.extend_layout(window['-CHAT-'], [[sg.Text(msg, justification='r', size=TEXT_ELEMENT_WIDTH, background_color=BACKGROUND_COLOR, pad=0)]])
+            window['-CHAT-'].contents_changed()
 
-        msg_encrypted = rsa.encrypt(msg.encode('utf8'), recipient_public_key)
-        send_msg(recipient_id, 'msg', client_id, msg_encrypted, server_socket)
+            log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
+            log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
+
+            msg_encrypted = rsa.encrypt(msg.encode('utf8'), recipient_public_key)
+            send_msg(recipient_id, 'msg', client_id, msg_encrypted, server_socket)
 
 server_socket.close()
 window.close()
