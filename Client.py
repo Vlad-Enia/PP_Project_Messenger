@@ -105,21 +105,22 @@ dir_path = create_client_dir(client_id)
 #     recipient_public_key = rsa.key.PublicKey.load_pkcs1(formatted_public_key, format='DER')
 #     print(f'{recipient_id} connected! Public key: {recipient_public_key}\n')
 
+WINDOW_WIDTH = 100
+WINDOW_HEIGHT = 100
 
 recipient_column = []
 sender_column = []
 layout = [
     [
-        sg.Column(recipient_column, key='-RECIPIENT-'),
-        sg.VSeparator(),
-        sg.Column(sender_column, key='-SENDER-')
+        sg.Column(layout=recipient_column, key='-RECIPIENT-', size=(210,210), scrollable=True, vertical_scroll_only=True, expand_y=True),
+        sg.Column(layout=sender_column, key='-SENDER-',size=(210,210), scrollable=True, vertical_scroll_only=True, expand_y=True)
     ],
     [
         sg.In(size=(25, 1), enable_events=True, key="-SEND_TEXT-"),
         sg.Button('Send', enable_events=True, key='-SEND_BUTTON-', bind_return_key=True)
     ]
 ]
-window = sg.Window(f'{client_id} chat window', layout, element_justification='center')
+window = sg.Window(f'{client_id} chat window', layout)
 
 received_msg_list = []
 received_msg_list_copy = []
@@ -132,16 +133,24 @@ while True:
     event, values = window.read(timeout=100)
 
     if event == sg.TIMEOUT_KEY and len(received_msg_list) != len(received_msg_list_copy):
-        window.extend_layout(window['-RECIPIENT-'], [[sg.Text(received_msg_list[-1])]])
+
+        window.extend_layout(window['-RECIPIENT-'], [[sg.Text(received_msg_list[-1], background_color='red')]])
+        window['-RECIPIENT-'].contents_changed()
         window.extend_layout(window['-SENDER-'], [[sg.Text('')]])
+        window['-SENDER-'].contents_changed()
+
         received_msg_list_copy = copy.deepcopy(received_msg_list)
     elif event == sg.WIN_CLOSED:
         break
     elif event == '-SEND_BUTTON-':
         msg = values['-SEND_TEXT-']
-        window['-SEND_TEXT-']('')      #clear input box when sending
-        window.extend_layout(window['-SENDER-'], [[sg.Text(msg)]])
+        window['-SEND_TEXT-'].update('')     #clear input box when sending
+
+        window.extend_layout(window['-SENDER-'], [[sg.Text(msg,  background_color='green', justification='r')]])
+        window['-SENDER-'].contents_changed()
         window.extend_layout(window['-RECIPIENT-'], [[sg.Text('')]])
+        window['-RECIPIENT-'].contents_changed()
+
         log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
         log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
 
