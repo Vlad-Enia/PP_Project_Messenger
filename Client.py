@@ -12,6 +12,7 @@ SERVER_PORT = 6001
 public_key, private_key = rsa.newkeys(512)
 print(f'Your public key: {public_key}\n')
 
+
 def create_client_dir(client_id):
     dir_path = f'./{client_id}_messages'
     if os.path.isdir(dir_path):
@@ -93,16 +94,37 @@ def connect_and_register(server_address, server_port):
     window.close()
     return sock, cl_id, recipient_id, recipient_public_key
 
+def show_message(frame_title, msg, justification):
+    window.extend_layout(
+        window['-CHAT-'],
+        [
+            [sg.Frame
+                (
+                '',
+                [[sg.Frame(f'{frame_title}',
+                           [[sg.Text(f'{msg}', background_color=BACKGROUND_COLOR)]],
+                           background_color=BACKGROUND_COLOR)]],
+                expand_x=True,
+                element_justification=justification,
+                border_width=0,
+                background_color=BACKGROUND_COLOR,
+                pad=0
+            )
+            ],
+            [sg.Text('', size=TEXT_ELEMENT_WIDTH, background_color=BACKGROUND_COLOR, pad=0)]
+        ]
+    )
+
+    window['-CHAT-'].contents_changed()
+
 
 server_socket, client_id, recipient_id, recipient_public_key = connect_and_register(SERVER_ADDRESS, SERVER_PORT)
 dir_path = create_client_dir(client_id)
-
 
 WINDOW_WIDTH = 700
 WINDOW_HEIGHT = 800
 BACKGROUND_COLOR = '#232629'
 TEXT_ELEMENT_WIDTH = 70
-
 
 """
     The layout is as follows:
@@ -119,7 +141,10 @@ TEXT_ELEMENT_WIDTH = 70
 column_layout = []
 layout = [
     [
-        sg.Frame('',[[sg.Column(layout=column_layout, key='-CHAT-', scrollable=True, expand_x=True, expand_y=True, vertical_scroll_only=True, pad=20, background_color=BACKGROUND_COLOR, element_justification='right')]], size=(WINDOW_WIDTH, WINDOW_HEIGHT-100), background_color=BACKGROUND_COLOR)
+        sg.Frame('', [[sg.Column(layout=column_layout, key='-CHAT-', scrollable=True, expand_x=True, expand_y=True,
+                                 vertical_scroll_only=True, pad=20, background_color=BACKGROUND_COLOR,
+                                 element_justification='right')]], size=(WINDOW_WIDTH, WINDOW_HEIGHT - 100),
+                 background_color=BACKGROUND_COLOR)
 
     ],
     [
@@ -128,8 +153,7 @@ layout = [
 
     ]
 ]
-window = sg.Window(f'{client_id}\'s chat window', layout, size=(WINDOW_WIDTH,WINDOW_HEIGHT))
-
+window = sg.Window(f'{client_id}\'s chat window', layout, size=(WINDOW_WIDTH, WINDOW_HEIGHT), keep_on_top=True)
 
 received_msg_list = []
 received_msg_list_copy = []
@@ -142,10 +166,7 @@ while True:
     event, values = window.read(timeout=100)
 
     if event == sg.TIMEOUT_KEY and len(received_msg_list) != len(received_msg_list_copy):
-
-        window.extend_layout(window['-CHAT-'], [[sg.Text(f'{recipient_id}: {received_msg_list[-1]}', justification='l', size=TEXT_ELEMENT_WIDTH, background_color=BACKGROUND_COLOR, pad=0)]])
-        window['-CHAT-'].contents_changed()
-
+        show_message(recipient_id, received_msg_list[-1], 'l')
         received_msg_list_copy = copy.deepcopy(received_msg_list)
     elif event == sg.WIN_CLOSED:
         break
@@ -155,10 +176,8 @@ while True:
         if len(msg) > 50:
             sg.popup('Message limit is 50 characters!')
         else:
-            window['-SEND_TEXT-'].update('')     #clear input box when sending
-
-            window.extend_layout(window['-CHAT-'], [[sg.Text(msg, justification='r', size=TEXT_ELEMENT_WIDTH, background_color=BACKGROUND_COLOR, pad=0)]])
-            window['-CHAT-'].contents_changed()
+            window['-SEND_TEXT-'].update('')  # clear input box when sending
+            show_message(client_id, msg, 'r')
 
             log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
             log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
