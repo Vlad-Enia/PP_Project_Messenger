@@ -6,6 +6,7 @@ import os
 
 SERVER_ADDRESS = '127.0.0.1'
 SERVER_PORT = 6001
+BUFFER_SIZE = 4096000
 CLIENT_NB = 5
 MESSAGE_LOG_FILENAME = 'message_history_log.txt'
 client_dict = dict()
@@ -33,7 +34,7 @@ def handle_client(conn):
     client_id = ''
     while conn not in client_dict.values():
         try:
-            data = conn.recv(4096)
+            data = conn.recv(BUFFER_SIZE)
         except Exception as e:
             print(' [THREAD] Connection interrupted...')
             conn.close()
@@ -52,7 +53,7 @@ def handle_client(conn):
 
                     confirmation = f'Welcome {client_id}! Please wait for another client to join.'
                     send_msg(client_id, 'register_ok', confirmation, conn)
-                    msg = pickle.loads(conn.recv(4096))
+                    msg = pickle.loads(conn.recv(BUFFER_SIZE))
                     print("MESSAGE", msg)
                     if msg['type'] == 'pbkey':
                         client_dict[client_id] = (conn, msg['body'])
@@ -69,7 +70,7 @@ def handle_client(conn):
             break
     while True:
         try:
-            data = conn.recv(4096)
+            data = conn.recv(BUFFER_SIZE)
         except Exception as e:
             print(' [THREAD] Connection interrupted...')
             break
