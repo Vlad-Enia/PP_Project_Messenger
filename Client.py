@@ -224,7 +224,9 @@ def create_emoji_dict():
         '-GRINNING_FACE-': 'Emojis/grinning_face.png',
         '-BEAMING_FACE-': 'Emojis/beaming_face.png',
         '-LAUGH_TEARS': 'Emojis/laugh_tears.png',
+        '-SMILE-': 'Emojis/smile.png',
         '-WINK-': 'Emojis/wink.png',
+        '-SUNGLASSES-': 'Emojis/sunglasses.png',
         '-ANGRY-': 'Emojis/angry.png',
         '-HEART-': 'Emojis/heart.png'
     }
@@ -251,11 +253,9 @@ server_socket, client_id, recipient_id, recipient_public_key, recipient_aes_key 
                                                                                                        SERVER_PORT)
 dir_path = create_client_dir(client_id)
 
-
-
 emoji_dict = create_emoji_dict()
 column_layout = []
-file_types = (("JPEG", "*.jpg"), ("PNG", "*.png"))
+file_types = (("PNG", "*.png"), ("JPEG", "*.jpg"))
 
 layout = [
     [
@@ -301,13 +301,31 @@ layout = [
     ]
 ]
 
+
 window = sg.Window(f'{client_id}\'s chat window', layout, size=(WINDOW_WIDTH, WINDOW_HEIGHT), keep_on_top=True, finalize=True)
-window['-SEND_BUTTON-'].bind('<Enter>', '-BUTTON_ENTER-')
-window['-SEND_BUTTON-'].bind('<Leave>', '-BUTTON_LEAVE-')
-window['-EMOJI_BUTTON-'].bind('<Enter>', '-BUTTON_ENTER-')
-window['-EMOJI_BUTTON-'].bind('<Leave>', '-BUTTON_LEAVE-')
-window['-FILE_BROWSE-'].bind('<Enter>', '-BUTTON_ENTER-')
-window['-FILE_BROWSE-'].bind('<Leave>', '-BUTTON_LEAVE-')
+# button_list_enter = ['-SEND_BUTTON-', '-EMOJI_BUTTON-', '-FILE_BROWSE-']
+# button_list_leave = ['-SEND_BUTTON-', '-EMOJI_BUTTON-', '-FILE_BROWSE-']
+# window['-SEND_BUTTON-'].bind('<Enter>', '+-BUTTON_ENTER-')
+# window['-SEND_BUTTON-'].bind('<Leave>', '+-BUTTON_LEAVE-')
+# window['-EMOJI_BUTTON-'].bind('<Enter>', '+-BUTTON_ENTER-')
+# window['-EMOJI_BUTTON-'].bind('<Leave>', '+-BUTTON_LEAVE-')
+# window['-FILE_BROWSE-'].bind('<Enter>', '+-BUTTON_ENTER-')
+# window['-FILE_BROWSE-'].bind('<Leave>', '+-BUTTON_LEAVE-')
+# for index in range(len(button_list_enter)):
+#     # window[button_list_enter[index]].bind('<Enter>', '+-BUTTON_ENTER-')
+#     button_list_enter[index] += '+-BUTTON_ENTER'
+#
+# for index in range(len(button_list_leave)):
+#     # window[button_list_leave[index]].bind('<Leave>', '+-BUTTON_LEAVE-')
+#     button_list_leave[index] += '+-BUTTON_LEAVE'
+#
+#
+# for emoji in emoji_dict.keys():
+#     window[emoji].bind('<Enter>', '+-BUTTON_ENTER-')
+#     window[emoji].bind('<Leave>', '+-BUTTON_LEAVE-')
+#     button_list_enter.append(emoji + '+-BUTTON_ENTER-')
+#     button_list_leave.append(emoji + '+-BUTTON_LEAVE-')
+
 
 received_msg_number = 0
 received_msg_number_copy = 0
@@ -330,7 +348,6 @@ while True:
     # this fixes the bug where, when there are a lot of messages and the scrollbar activates,
     # there would be a delay of one message
     event, values = window.read(timeout=100)
-
     if event == sg.TIMEOUT_KEY:
         if received_msg_number != received_msg_number_copy:
             msg = received_msg_list[-1]
@@ -346,18 +363,26 @@ while True:
     elif event == sg.WIN_CLOSED:
         break
 
-    elif event == '-SEND_BUTTON--BUTTON_ENTER-':
-        window['-SEND_BUTTON-'].update(button_color=BUTTON_COLOR_HOVER)
-    elif event == '-SEND_BUTTON--BUTTON_LEAVE-':
-        window['-SEND_BUTTON-'].update(button_color=BUTTON_COLOR)
-    elif event == '-EMOJI_BUTTON--BUTTON_ENTER-':
-        window['-EMOJI_BUTTON-'].update(button_color=BUTTON_COLOR_HOVER)
-    elif event == '-EMOJI_BUTTON--BUTTON_LEAVE-':
-        window['-EMOJI_BUTTON-'].update(button_color=BUTTON_COLOR)
-    elif event == '-FILE_BROWSE--BUTTON_ENTER-':
-        window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR_HOVER)
-    elif event == '-FILE_BROWSE--BUTTON_LEAVE-':
-        window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR)
+    # elif event == '-SEND_BUTTON--BUTTON_ENTER-':
+    #     window['-SEND_BUTTON-'].update(button_color=BUTTON_COLOR_HOVER)
+    # elif event == '-SEND_BUTTON--BUTTON_LEAVE-':
+    #     window['-SEND_BUTTON-'].update(button_color=BUTTON_COLOR)
+    # elif event == '-EMOJI_BUTTON--BUTTON_ENTER-':
+    #     window['-EMOJI_BUTTON-'].update(button_color=BUTTON_COLOR_HOVER)
+    # elif event == '-EMOJI_BUTTON--BUTTON_LEAVE-':
+    #     window['-EMOJI_BUTTON-'].update(button_color=BUTTON_COLOR)
+    # elif event == '-FILE_BROWSE--BUTTON_ENTER-':
+    #     window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR_HOVER)
+    # elif event == '-FILE_BROWSE--BUTTON_LEAVE-':
+    #     window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR)
+
+    # elif event in button_list_enter or event in button_list_leave:
+    #     button_event = event.split('+')
+    #     print(button_event)
+    #     if button_event[1] == '-BUTTON_LEAVE-':
+    #         window[button_event[0]].update(button_color=BUTTON_COLOR)
+    #     else:
+    #         window[button_event[0]].update(button_color=BUTTON_COLOR_HOVER)
 
     elif event == '-FILE_PATH-':
         window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR)
@@ -366,14 +391,15 @@ while True:
     elif event == '-SEND_BUTTON-':
         if not image_selected:
             msg = values['-SEND_TEXT-']
-            window['-SEND_TEXT-'].update('')  # clear input box when sending
-            if len(msg) > 50:
-                sg.popup('Message limit is 50 characters!')
-            else:
-                show_message(client_id, msg, 'r')
-                log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
-                log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
-                send_msg(recipient_id, 'msg', client_id, msg, server_socket)
+            if msg != '':
+                window['-SEND_TEXT-'].update('')  # clear input box when sending
+                if len(msg) > 50:
+                    sg.popup('Message limit is 50 characters!')
+                else:
+                    show_message(client_id, msg, 'r')
+                    log_message(f'{dir_path}/message_history_log.txt', client_id, msg)
+                    log_message(f'{dir_path}/{client_id}_sent_messages.txt', client_id, msg)
+                    send_msg(recipient_id, 'msg', client_id, msg, server_socket)
 
         else:
             sent_images += 1
