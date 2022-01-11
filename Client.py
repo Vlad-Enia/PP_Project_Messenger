@@ -393,8 +393,7 @@ image_selected = False
 
 while True:
     window['-CHAT-'].contents_changed()     # this method is called so that the scrollbar is updated when it is needed
-    # this fixes the bug where, when there are a lot of messages and the scrollbar activates,
-    # there would be a delay of one message
+                                            # this fixes the bug where, when there are a lot of messages and the scrollbar activates, the messages would be exchanged with delay
     event, values = window.read(timeout=100)
     if event == sg.TIMEOUT_KEY:                                                 # normally the while stalls until an event takes place, but since a separate thread can't trigger an event in the GUI in the main thread, a timeout of 100ms is set, so that each 100ms a while iteration passes
                                                                                 # this is done so that each 100ms the main thread checks if something was written in the shared variables by the separate thread (meaning that a message was received)
@@ -407,11 +406,15 @@ while True:
         elif received_images_number != received_images_number_copy:             # when received_msg_number != received_msg_number_copy we know that a image message was received by the separate thread
             print(f'{recipient_id}: sent image')
             received_images_number_copy = copy.copy(received_images_number)     # the number of received text messages is updated
-            show_image(recipient_id, received_images_list[-1], 'l')             # the text message is displayed in the GUI
+            image = Image.open(io.BytesIO(received_images_list[-1]))
+            compressed_image_bytes = io.BytesIO()
+            image.thumbnail((500, 500))  # compress the image
+            image.save(compressed_image_bytes, format='PNG')
+
+            show_image(recipient_id, compressed_image_bytes.getvalue(), 'l')             # the text message is displayed in the GUI
 
     elif event == sg.WIN_CLOSED:
         break
-
 
     elif event == '-FILE_PATH-':                                                # since the image browser can't trigger an event, we check if there was a modification in the input field containing a file path to know if an image was selected for sending
         window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR)
@@ -441,11 +444,16 @@ while True:
                 window['-FILE_PATH-'].update('')
                 if os.path.exists(path):                                                    # check if the path exists and is valid
                     image = Image.open(path)                                                # load the image in memory
-                    image.thumbnail((500, 500))                                             # compress the image
+                    image.thumbnail((1920,1080))                                            # compress image to FHD so it will fit in the socket
                     image_bytes = io.BytesIO()
-                    image.save(image_bytes, format='PNG')                                            # image is converted to PNG and then to byte string
+                    image.save(image_bytes, format='PNG')                                   # image is converted to PNG and then to byte string
+
+                    compressed_image_bytes = io.BytesIO()
+                    image.thumbnail((500, 500))                                             # compress the image even more for thumbnail that will be displayed in the GUI
+                    image.save(compressed_image_bytes, format='PNG')
+
                     send_msg(recipient_id, 'img', client_id, image_bytes.getvalue(),server_socket)   # the image is sent to the other client
-                    show_image(client_id, image_bytes.getvalue(), 'r')                               # the image is displayed in the gui
+                    show_image(client_id, compressed_image_bytes.getvalue(), 'r')                               # the image is displayed in the gui
                     log_image(f'{dir_path}/sent_images/image{sent_images}.png', image_bytes.getvalue()) # image is logged in the client's directory of sent images
 
     elif event == '-EMOJI_BUTTON-':
