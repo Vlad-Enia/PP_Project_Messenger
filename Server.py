@@ -27,7 +27,13 @@ def send_msg(recipient, msg_type, msg, recipient_socket):
         'recipient': recipient,
         'body': msg
     }
-    recipient_socket.send(pickle.dumps(d))
+    try:
+        recipient_socket.send(pickle.dumps(d))
+    except Exception as e:
+        print(f' [THREAD] Connection interrupted... {recipient} disconnected')
+        client_dict.pop(recipient)
+        recipient_socket.close()
+
 
 
 def forward_message(msg_pickle, recipient_socket):
@@ -37,7 +43,17 @@ def forward_message(msg_pickle, recipient_socket):
     :param recipient_socket: socket used for communication with the recipient
     :return:
     """
-    recipient_socket.send(msg_pickle)
+
+    d = pickle.loads(msg_pickle)
+
+    recipient = d['recipient']
+
+    try:
+        recipient_socket.send(msg_pickle)
+    except Exception as e:
+        print(f' [THREAD] Connection interrupted... {recipient} disconnected')
+        client_dict.pop(recipient)
+        recipient_socket.close()
 
 
 def handle_client(conn):
@@ -55,9 +71,9 @@ def handle_client(conn):
             data = conn.recv(BUFFER_SIZE)
         except Exception as e:
             print(' [THREAD] Connection interrupted...')
-            client_dict.pop(client_id, None)
+
             conn.close()
-            break
+            exit()
 
         else:
             msg = pickle.loads(data)
@@ -90,14 +106,14 @@ def handle_client(conn):
             send_msg(client_id, 'recipient_id', cl, conn)
             conn.send(client_dict[cl][1])
             recipient_id = cl
-            break
+            break                                                                                       #decomment for more clients
 
     while True:                                                                                         # after that, the server is ready to forward messages between clients
         try:
             msg = conn.recv(BUFFER_SIZE)
         except Exception as e:
-            print(' [THREAD] Connection interrupted...')
-            client_dict.pop(client_id, None)
+            print(f' [THREAD] Connection interrupted... {client_id} disconnected')
+            send_msg(recipient_id, 'error', f'{client_id} disconnected', client_dict[recipient_id][0])
             conn.close()
             break
         else:

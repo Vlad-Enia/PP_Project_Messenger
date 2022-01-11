@@ -10,6 +10,7 @@ from threading import Thread
 from PIL import Image
 from Crypto.Util.Padding import pad, unpad
 from Crypto.Cipher import AES
+from datetime import datetime
 
 
 def create_client_dir(client_id):
@@ -35,8 +36,9 @@ def log_message(filename, sender, message):
     :param sender: string containing the id of the sender
     :param message: string containing the message that is to be stored
     """
+    now = datetime.now().strftime("%d.%b.%Y. %H:%M:%S")
     f = open(filename, 'a')
-    f.write(f'{sender}: {message}\n')
+    f.write(f'{sender} - {now}: {message}\n')
     f.close()
 
 
@@ -48,6 +50,7 @@ def log_image(filename, img_bytes):
     """
     image = Image.open(io.BytesIO(img_bytes))
     image.save(filename)
+
 
 
 def rec_msg(sender_socket):
@@ -77,7 +80,16 @@ def rec_msg(sender_socket):
             received_images_number += 1
             img = decrypt_image(msg['body'])
             received_images_list.append(img)
-            log_image(f'{dir_path}/received_images/image{received_images_number}.png', img)
+            image_path = f'{dir_path}/received_images/image{received_images_number}.png'
+            log_image(image_path, img)
+            log_message(f'{dir_path}/message_history_log.txt', sender, os.path.abspath(image_path))
+        if msg['type'] == 'error':
+            print("ERROR: " + msg['body'])
+            global received_errors_number
+            global received_errors_list
+            received_errors_list.append(msg['body'])
+            received_errors_number += 1
+
 
 
 def encrypt_image(img):
@@ -379,6 +391,10 @@ received_images_list = []
 # these three are the shared variables between the main thread and the separate thread that receives messages (used for image messages)
 received_images_number_copy = 0 # when received_msg_number != received_msg_number_copy we know that a image message was received by the separate thread
 
+received_errors_number = 0
+received_errors_list = []
+received_errors_number_copy = 0
+
 sent_images = 0     # variable used for counting the images sent, so that they will have an unique name when they are logged
 
 t = Thread(target=rec_msg, args=(server_socket,))
@@ -400,8 +416,14 @@ while True:
         if received_msg_number != received_msg_number_copy:                     # when received_msg_number != received_msg_number_copy we know that a text message was received by the separate thread
             msg = received_msg_list[-1]
             print(f'{recipient_id}: {msg}')
-            received_msg_number_copy = copy.copy(received_msg_number)           # the number of received text messages is updated
-            show_message(recipient_id, msg, 'l')                                # the text message is displayed in the GUI
+            received_msg_number_copy = copy.copy(received_msg_number)  # the number of received text messages is updated
+            if msg in emoji_dict.keys():
+                img = Image.open(emoji_dict[msg])
+                img_bytes = io.BytesIO()
+                img.save(img_bytes, format='PNG')
+                show_image(recipient_id, img_bytes.getvalue(), 'l')
+            else:
+                show_message(recipient_id, msg, 'l')                                # the text message is displayed in the GUI
 
         elif received_images_number != received_images_number_copy:             # when received_msg_number != received_msg_number_copy we know that a image message was received by the separate thread
             print(f'{recipient_id}: sent image')
@@ -410,8 +432,12 @@ while True:
             compressed_image_bytes = io.BytesIO()
             image.thumbnail((500, 500))  # compress the image
             image.save(compressed_image_bytes, format='PNG')
-
             show_image(recipient_id, compressed_image_bytes.getvalue(), 'l')             # the text message is displayed in the GUI
+
+        elif received_errors_number != received_errors_number_copy:
+            received_errors_number_copy = copy.copy(received_errors_number)
+            sg.popup(received_errors_list[-1])
+
 
     elif event == sg.WIN_CLOSED:
         break
@@ -419,9 +445,11 @@ while True:
     elif event == '-FILE_PATH-':                                                # since the image browser can't trigger an event, we check if there was a modification in the input field containing a file path to know if an image was selected for sending
         window['-FILE_BROWSE-'].update(button_color=BUTTON_COLOR)
         image_selected = True
+        window['-SEND_BUTTON-'].update('Send Image')
 
     elif event == '-SEND_TEXT-':                                                # if an user selected an image but then changes his mind, he can write something in the input field for a text message, so that he won't send the image selected before
         image_selected = False
+        window['-SEND_BUTTON-'].update('Send')
 
     elif event == '-SEND_BUTTON-':                                              # if the send button is pressed (or 'enter' key)
         if not image_selected:                                                  # case for text message
@@ -439,6 +467,7 @@ while True:
         else:                                                                               #case for sending images
             sent_images += 1
             image_selected = False
+            window['-SEND_BUTTON-'].update('Send')
             if values['-FILE_PATH-'] != '':                                                 # check if somehow an empty path resulted when an images was chosen
                 path = values['-FILE_PATH-']                                                # the path is extracted from the file path invisible input tool that only the file browser for images writes in
                 window['-FILE_PATH-'].update('')
@@ -454,7 +483,9 @@ while True:
 
                     send_msg(recipient_id, 'img', client_id, image_bytes.getvalue(),server_socket)   # the image is sent to the other client
                     show_image(client_id, compressed_image_bytes.getvalue(), 'r')                               # the image is displayed in the gui
-                    log_image(f'{dir_path}/sent_images/image{sent_images}.png', image_bytes.getvalue()) # image is logged in the client's directory of sent images
+                    image_path = f'{dir_path}/sent_images/image{sent_images}.png'
+                    log_image(image_path, image_bytes.getvalue()) # image is logged in the client's directory of sent images
+                    log_message(f'{dir_path}/message_history_log.txt', client_id, os.path.abspath(image_path))
 
     elif event == '-EMOJI_BUTTON-':
         if not emojis_visible:                                     # show emoji buttons
@@ -472,14 +503,15 @@ while True:
     elif event in emoji_dict.keys():                               # if one of the emoji buttons is pressed, then it is sent exactly the same as an image
         sent_images += 1
         path = emoji_dict[event]
-        if os.path.exists(path):
+        if os.path.exists(path):                                   # check if path is valid
             image = Image.open(path)
             image_bytes = io.BytesIO()
             image.save(image_bytes, format='PNG')
-            send_msg(recipient_id, 'img', client_id, image_bytes.getvalue(),
-                     server_socket)
+
             show_image(client_id, image_bytes.getvalue(), 'r')
             log_image(f'{dir_path}/sent_images/image{sent_images}.png', image_bytes.getvalue())
+            # send_msg(recipient_id, 'img', client_id, image_bytes.getvalue(), server_socket)
+            send_msg(recipient_id, 'msg', client_id, event, server_socket)
 
 server_socket.close()
 window.close()
